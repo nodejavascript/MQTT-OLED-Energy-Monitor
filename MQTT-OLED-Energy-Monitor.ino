@@ -1,8 +1,8 @@
+#include "config.h"
+#include <ESP8266WiFi.h>
+#include <PubSubClient.h>
 #include <ArduinoJson.h>
-
 #include <Adafruit_INA219.h>
-Adafruit_INA219 ina219;
-
 
 #define ANALOG_PIN A0
 #define BUTTON_PIN D6
@@ -13,19 +13,12 @@ unsigned long debounceDelay = 50; // increase if too sensitive
 
 unsigned int menuNumber = 1;
 
-uint8_t SSD1306_ADDRESS = 0x3C;
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+Adafruit_INA219 ina219;
 
 void displayAttribute(const char *label, float value, const char *units, uint8_t textSize, uint8_t numberOfDecimals);
-
-bool startINA219() {
-  if (!ina219.begin()) {
-    Serial.println(F("INA219 initialization failed."));
-    return false;
-  }
-
-  ina219.setCalibration_32V_2A();
-  return true;
-}
 
 void IRAM_ATTR buttonClick() {
   unsigned long currentMillis = millis();
@@ -35,24 +28,76 @@ void IRAM_ATTR buttonClick() {
   }
 }
 
-void setup() {
-  Serial.begin(9600);
+void setup_wifi() {
 
-  startSSD1036(SSD1306_ADDRESS);
+  Serial.println();
+  Serial.print("Connecting to ");
+  Serial.println(WIFI_SSID);
+
+  WiFi.hostname(WIFI_HOST);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(1000);
+    Serial.print(".");
+  }
+
+  Serial.println("");
+  Serial.println("WiFi connected");
+  Serial.println("IP address: ");
+  Serial.println(WiFi.localIP());
+
+  client.setServer(MQTT_SERVER, MQTT_PORT);
+
+}
+
+
+void setup() {
+  Serial.begin(115200);
+
+  startSSD1036();
 
   startINA219();
 
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), buttonClick, FALLING);
 
-  delay(200);
+  
+  delay(250);
   
   // Clear the serial monitor screen
-  Serial.print("\033[2J");
+
   Serial.println("Started");
+
+  delay(250);
+  setup_wifi();
+  delay(1000);
+  
+}
+
+void reconnect() {
+  Serial.print("Connecting to ");
+  Serial.println(MQTT_SERVER);
+
+  while (!client.connected()) {
+    if (!client.connect(MQTT_CLIENT, MQTT_USER, MQTT_PASSWORD)) {
+      delay(1000);
+      Serial.print(".");
+    }
+  }
+
+  
+  Serial.println("");
+  Serial.println("MQTT connected");
+
 }
 
 void loop() {
+  if (!client.connected()) {
+    reconnect();
+  }
+  client.loop();
+  
   if (buttonPressed) {
     buttonClick();
     buttonPressed = false;
@@ -93,10 +138,6 @@ void loop() {
   doc["current_A"] = current_A;
   doc["power_W"] = power_W;
   
-  String payload;
-  serializeJson(doc, payload);
-  Serial.println(payload);
-
   if (menuNumber == 0) {
     displayAttribute("", voltage_V, " Volts", 2, 1);
     displayAttribute("", current_A, " Amps", 2, 1);
@@ -113,5 +154,23 @@ void loop() {
 
   displayDisplay();
 
+    
+  String payloadSerialized;
+
+  serializeJson(doc, payloadSerialized);
+
+  client.publish(MQTT_TOPIC, payloadSerialized.c_str());
   delay(delayValue);
+}
+
+
+
+bool startINA219() {
+  if (!ina219.begin()) {
+    Serial.println(F("INA219 initialization failed."));
+    return false;
+  }
+
+  ina219.setCalibration_32V_2A();
+  return true;
 }
