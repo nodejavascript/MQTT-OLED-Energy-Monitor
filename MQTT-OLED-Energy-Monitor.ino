@@ -37,7 +37,6 @@ void IRAM_ATTR buttonClick() {
 }
 
 void setup_wifi() {
-
   Serial.println("Device started.");
 
   Serial.print("WiFi: Connecting to ");
@@ -45,9 +44,12 @@ void setup_wifi() {
 
   WiFi.hostname(WIFI_HOST);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-
+  
+  unsigned int startTime = millis();
+  
   while (WiFi.status() != WL_CONNECTED) {
-    delay(1000);
+    displaySetup(startTime);
+    delay(250);
     Serial.print(".");
   }
 
@@ -70,6 +72,7 @@ void reconnect() {
     if (!client.connect(MQTT_CLIENT, MQTT_USER, MQTT_PASSWORD)) {
       delay(1000);
       Serial.print(".");
+          
     }
   }
 
@@ -96,8 +99,8 @@ void setup() {
   // Clear the serial monitor screen
 
   Serial.println("Started");
-
-  delay(250);
+  
+      
   setup_wifi();
   delay(1000);
 
@@ -142,6 +145,7 @@ void loop() {
   current_mA = ina219.getCurrent_mA();
   power_mW = ina219.getPower_mW();
   loadvoltage = busvoltage + (shuntvoltage / 1000);
+  voltage_V = loadvoltage;
   current_A = current_mA / 1000;
   power_W = voltage_V * current_A;
 
@@ -151,14 +155,14 @@ void loop() {
   doc["current_mA"] = current_mA;
   doc["power_mW"] = power_mW;
   doc["loadvoltage"] = loadvoltage;
-  doc["voltage_V"] = loadvoltage;
-  doc["current_A"] = current_mA / 1000;
-  doc["power_W"] = loadvoltage * current_mA / 1000;
+  doc["voltage_V"] = voltage_V;
+  doc["current_A"] = current_A;
+  doc["power_W"] = power_W;
 
   if (menuNumber == 0) {
-    displayAttribute("", voltage_V, " Volts", 2, 1);
-    displayAttribute("", current_A, " Amps", 2, 1);
-    displayAttribute("", power_W, " Watts", 2, 1);
+    displayAttribute(" ", voltage_V, " V ", 2, 1);
+    displayAttribute(" ", current_mA, " mA", 2, 1);
+    displayAttribute(" ", power_W, " W ", 2, 1);
   }
 
   if (menuNumber == 1) {

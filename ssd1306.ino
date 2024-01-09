@@ -75,6 +75,13 @@ void displayAttribute(const char *label, float value, const char *units, uint8_t
   }
 }
 
+void displaySetup (unsigned int startTime) {
+  display.clearDisplay();
+  display.setCursor(0, 0);
+  displayAttribute("Connecting", (millis() - startTime) / 1000, " s", 1, 1);
+  displayDisplay();
+}
+
 void createDisplayNav(int displayDelay, int pubCount) {
   display.clearDisplay();
   display.setCursor(0, 0);
