@@ -1,3 +1,4 @@
+
 #include "config.h"
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
@@ -11,7 +12,14 @@ volatile bool buttonPressed = false;
 volatile unsigned long lastDebounceTime = 0;
 unsigned long debounceDelay = 50; // increase if too sensitive
 
-unsigned int menuNumber = 1;
+unsigned int menuNumber = 0;
+
+unsigned int pubTimer;
+unsigned int pubCount = 0;
+unsigned int pubDelay = 10000;
+
+unsigned int displayTimer;
+unsigned int displayDelay;
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -30,9 +38,10 @@ void IRAM_ATTR buttonClick() {
 
 void setup_wifi() {
 
-  Serial.println();
-  Serial.print("Connecting to ");
-  Serial.println(WIFI_SSID);
+  Serial.println("Device started.");
+
+  Serial.print("WiFi: Connecting to ");
+  Serial.print(WIFI_SSID);
 
   WiFi.hostname(WIFI_HOST);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
@@ -42,15 +51,34 @@ void setup_wifi() {
     Serial.print(".");
   }
 
-  Serial.println("");
-  Serial.println("WiFi connected");
-  Serial.println("IP address: ");
+  Serial.println();
+  Serial.println("WiFi connected.");
+  Serial.print("IP address ");
   Serial.println(WiFi.localIP());
 
   client.setServer(MQTT_SERVER, MQTT_PORT);
 
+  pubTimer = millis();
+  displayTimer = millis();
 }
 
+void reconnect() {
+  Serial.print("MQTT: Connecting to ");
+  Serial.print(MQTT_SERVER);
+
+  while (!client.connected()) {
+    if (!client.connect(MQTT_CLIENT, MQTT_USER, MQTT_PASSWORD)) {
+      delay(1000);
+      Serial.print(".");
+    }
+  }
+
+  Serial.println();
+  Serial.println("MQTT connected.");
+  Serial.print("pubDelay ");
+  Serial.println(pubDelay);
+
+}
 
 void setup() {
   Serial.begin(115200);
@@ -62,9 +90,9 @@ void setup() {
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), buttonClick, FALLING);
 
-  
+
   delay(250);
-  
+
   // Clear the serial monitor screen
 
   Serial.println("Started");
@@ -72,32 +100,21 @@ void setup() {
   delay(250);
   setup_wifi();
   delay(1000);
-  
-}
-
-void reconnect() {
-  Serial.print("Connecting to ");
-  Serial.println(MQTT_SERVER);
-
-  while (!client.connected()) {
-    if (!client.connect(MQTT_CLIENT, MQTT_USER, MQTT_PASSWORD)) {
-      delay(1000);
-      Serial.print(".");
-    }
-  }
-
-  
-  Serial.println("");
-  Serial.println("MQTT connected");
 
 }
+
+bool mqttConnected = false;
 
 void loop() {
   if (!client.connected()) {
+    mqttConnected = false;
     reconnect();
+  } else {
+    mqttConnected = true;
   }
   client.loop();
-  
+
+
   if (buttonPressed) {
     buttonClick();
     buttonPressed = false;
@@ -105,11 +122,11 @@ void loop() {
     menuNumber++;
     if (menuNumber > 1) menuNumber = 0;
   }
-  
-  int potValue = analogRead(ANALOG_PIN);
-  int delayValue = map(potValue, 0, 1023, 0, 1000);
 
-  createDisplayNav(delayValue, menuNumber);
+  int potValue = analogRead(ANALOG_PIN);
+  int displayDelay = map(potValue, 0, 1023, 0, 1000);
+
+  createDisplayNav(displayDelay, pubCount);
 
   float shuntvoltage = 0;
   float busvoltage = 0;
@@ -127,17 +144,17 @@ void loop() {
   loadvoltage = busvoltage + (shuntvoltage / 1000);
   current_A = current_mA / 1000;
   power_W = voltage_V * current_A;
-  
+
   StaticJsonDocument<256> doc;
   doc["shuntvoltage"] = shuntvoltage;
   doc["busvoltage"] = busvoltage;
   doc["current_mA"] = current_mA;
   doc["power_mW"] = power_mW;
   doc["loadvoltage"] = loadvoltage;
-  doc["voltage_V"] = voltage_V;
-  doc["current_A"] = current_A;
-  doc["power_W"] = power_W;
-  
+  doc["voltage_V"] = loadvoltage;
+  doc["current_A"] = current_mA / 1000;
+  doc["power_W"] = loadvoltage * current_mA / 1000;
+
   if (menuNumber == 0) {
     displayAttribute("", voltage_V, " Volts", 2, 1);
     displayAttribute("", current_A, " Amps", 2, 1);
@@ -145,22 +162,39 @@ void loop() {
   }
 
   if (menuNumber == 1) {
+    displayAttribute("Load", loadvoltage, "  V",  1, 3);
+    displayAttribute("Current", current_mA, " mA", 1 , 3);
     displayAttribute("Shunt", shuntvoltage, " mV", 1, 3);
     displayAttribute("Bus", busvoltage, "  V", 1, 3);
-    displayAttribute("Current", current_mA, " mA", 1 , 3);
     displayAttribute("Power", power_mW, " mW", 1, 3);
-    displayAttribute("Load", loadvoltage, "  V",  1, 3);
   }
 
-  displayDisplay();
+  if (millis() > displayTimer + displayDelay ) {
 
-    
+    displayDisplay();
+    Serial.print("Display deplay: ");
+    Serial.println(displayDelay);
+    displayTimer = millis();
+  }
+
   String payloadSerialized;
-
   serializeJson(doc, payloadSerialized);
 
-  client.publish(MQTT_TOPIC, payloadSerialized.c_str());
-  delay(delayValue);
+  if (mqttConnected && millis() > pubTimer + pubDelay ) {
+
+    client.publish(MQTT_TOPIC, payloadSerialized.c_str());
+    
+    pubCount += 1;
+    Serial.print(pubCount);
+    Serial.print(", ");
+    Serial.println(MQTT_TOPIC);
+    Serial.println(payloadSerialized);
+
+    pubTimer = millis();
+
+  }
+
+  delay(50);
 }
 
 

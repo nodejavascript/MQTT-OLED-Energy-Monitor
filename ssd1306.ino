@@ -75,10 +75,10 @@ void displayAttribute(const char *label, float value, const char *units, uint8_t
   }
 }
 
-void createDisplayNav(int delayValue, int menuNumber) {
+void createDisplayNav(int displayDelay, int pubCount) {
   display.clearDisplay();
   display.setCursor(0, 0);
 
-  displayAttribute("Delay (A0):", delayValue, " ms", 1, 1);
-  displayAttribute("MenuId:", menuNumber, "", 1, 0);
+  displayAttribute("Delay (A0):", displayDelay, " ms", 1, 1);
+  displayAttribute("MQTT Count:", pubCount, "", 1, 0);
 }
