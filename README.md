@@ -24,7 +24,7 @@ Connect this USB bridge to measure the total power usage for a line of USB ports
 ## Features
 
 - Measures current, voltage, and power consumption
-- Publishes data over MQTT
+- Publishes data over MQTT every 10 seconds
 - Displays data on SSD1306 OLED display
 - Interactive button for menu navigation
 - Configurable display delay (A0)
@@ -40,7 +40,7 @@ Connect this USB bridge to measure the total power usage for a line of USB ports
 
 ## Configuration
 
-The configuration for the WiFi network, MQTT server, and publishing delay is done in the `config.h` file.
+The configuration for the WiFi network in MQTT server `config.h` file. See `config.h.example`.
 
 ## Contributing
 
