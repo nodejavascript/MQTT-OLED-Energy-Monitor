@@ -75,17 +75,21 @@ void displayAttribute(const char *label, float value, const char *units, uint8_t
   }
 }
 
-void displaySetup (unsigned int startTime) {
+void displaySetup (unsigned long startTime) {
   display.clearDisplay();
   display.setCursor(0, 0);
-  displayAttribute("Connecting", (millis() - startTime) / 1000, " s", 1, 1);
+  displayAttribute("Connecting Wifi", (millis() - startTime) / 1000, " s", 1, 0);
   displayDisplay();
 }
 
-void createDisplayNav(int displayDelay, int pubCount) {
+void createDisplayNav(int displayDelay, int pubCount, bool mqttConnected) {
   display.clearDisplay();
   display.setCursor(0, 0);
 
-  displayAttribute("Delay (A0):", displayDelay, " ms", 1, 1);
-  displayAttribute("MQTT Count:", pubCount, "", 1, 0);
+  displayAttribute("Delay (A0):", displayDelay, " ms", 1, 0);
+  if (mqttConnected) {
+    displayAttribute("MQTT Count:", pubCount, "", 1, 0);
+  } else {
+    displayAttribute("MQTT FAIL:", pubCount, "", 1, 0);
+  }
 }

@@ -21,6 +21,13 @@ unsigned int pubDelay = 10000;
 unsigned int displayTimer;
 unsigned int displayDelay;
 
+
+
+bool mqttConnected = false;
+
+unsigned long nextMqttAttempt = millis();
+
+
 WiFiClient espClient;
 PubSubClient client(espClient);
 
@@ -44,9 +51,9 @@ void setup_wifi() {
 
   WiFi.hostname(WIFI_HOST);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  
-  unsigned int startTime = millis();
-  
+
+  unsigned long startTime = millis();
+
   while (WiFi.status() != WL_CONNECTED) {
     displaySetup(startTime);
     delay(250);
@@ -65,23 +72,20 @@ void setup_wifi() {
 }
 
 void reconnect() {
+  Serial.println();
   Serial.print("MQTT: Connecting to ");
   Serial.print(MQTT_SERVER);
-
-  while (!client.connected()) {
-    if (!client.connect(MQTT_CLIENT, MQTT_USER, MQTT_PASSWORD)) {
-      delay(1000);
-      Serial.print(".");
-          
-    }
+  if (!client.connect(MQTT_CLIENT, MQTT_USER, MQTT_PASSWORD)) {
+    delay(250);
+    Serial.print(".");
+  } else {
+    Serial.println();
+    Serial.println("MQTT connected.");
+    Serial.print("pubDelay ");
+    Serial.println(pubDelay);
   }
-
-  Serial.println();
-  Serial.println("MQTT connected.");
-  Serial.print("pubDelay ");
-  Serial.println(pubDelay);
-
 }
+
 
 void setup() {
   Serial.begin(115200);
@@ -99,23 +103,25 @@ void setup() {
   // Clear the serial monitor screen
 
   Serial.println("Started");
-  
-      
+
+
   setup_wifi();
   delay(1000);
 
 }
 
-bool mqttConnected = false;
-
 void loop() {
   if (!client.connected()) {
     mqttConnected = false;
-    reconnect();
+
+    if (millis() > nextMqttAttempt) {
+      nextMqttAttempt = millis() + pubDelay;
+      reconnect();
+    }
   } else {
     mqttConnected = true;
+    client.loop();
   }
-  client.loop();
 
 
   if (buttonPressed) {
@@ -129,7 +135,7 @@ void loop() {
   int potValue = analogRead(ANALOG_PIN);
   int displayDelay = map(potValue, 0, 1023, 0, 1000);
 
-  createDisplayNav(displayDelay, pubCount);
+  createDisplayNav(displayDelay, pubCount, mqttConnected);
 
   float shuntvoltage = 0;
   float busvoltage = 0;
@@ -187,7 +193,7 @@ void loop() {
   if (mqttConnected && millis() > pubTimer + pubDelay ) {
 
     client.publish(MQTT_TOPIC, payloadSerialized.c_str());
-    
+
     pubCount += 1;
     Serial.print(pubCount);
     Serial.print(", ");
