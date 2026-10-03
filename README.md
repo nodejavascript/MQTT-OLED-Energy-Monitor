@@ -1,5 +1,11 @@
 # ESP8266 MQTT INA219 Current Sensor
 
+Charging a battery tells you nothing until you can watch the current fall. This puts an ESP8266, an INA219 current sensor and an SSD1306 OLED together and publishes voltage, current and power over MQTT — so the moment a cell finishes charging is visible in a graph, and can raise a notification.
+
+**Files:** `MQTT-OLED-Energy-Monitor.ino` is the sketch · `ssd1306.ino` drives the display · `config.h.example` holds the settings you copy to `config.h`.
+
+---
+
 This is a simple project that uses an ESP8266, an INA219 current sensor, and an SSD1306 OLED display to measure and publish current, voltage, and power consumption data over MQTT.
 
 # Motivation
